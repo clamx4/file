@@ -9,11 +9,11 @@
 	}
 
 	function list_files() {
-		$bucket_name = "file-center";
+		$bucket_name = "**";
 		$host = "sinacloud.net";
 		$url = $host."/".$bucket_name."/?formatter=json";
 		$date = gmdate('D, d M Y H:i:s \G\M\T', time());
-		$resource = "/file-center/";
+		$resource = "/**/";
 		$mySecretKey = "*************************************";
 		$accessKey = "****************";
 
@@ -40,12 +40,12 @@
 	}
 
 	function delete_file($file_name) {
-		$bucket_name = "file-center";
+		$bucket_name = "**";
 		$host = $bucket_name.".sinacloud.net";
 		//$url = $host."/".$bucket_name."/?formatter=json";
 		$url = $host."/".$file_name."?formatter=json";
 		$date = gmdate('D, d M Y H:i:s \G\M\T', time());
-		$resource = "/file-center/".$file_name;
+		$resource = "/**/".$file_name;
 		$mySecretKey = "*************************************";
 		$accessKey = "****************";
 
@@ -99,7 +99,7 @@
 
 	// 根据文件名，生成文件的url，使用url签名认证
 	function generate_file_url($file_name) {
-		$bucket_name = "file-center";
+		$bucket_name = "**";
 		$host = "sinacloud.net";
 		//$file_name = $file -> {"Name"};
 		$file_name = urlencode($file_name);
