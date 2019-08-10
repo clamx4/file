@@ -1,10 +1,150 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>sample</title>
+    <meta charset="utf-8">
+    <title>Print sample</title>
   </head>
   <body>
-  <span>x</span>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsSHA/2.3.1/sha512.js"></script>
+    <div id="app">
+      <span id="info">loading files...</span>
+      <ul>
+        <li v-for="file in files">
+      <a :href="file.url" target="_blank">{{file.name}}</a>
+      <span>&nbsp;</span>
+      <a :href="file.url+'&fn='+file.name" download="">download</a>
+          <span>&nbsp;{{file.size}}B&nbsp;</span>
+      <button v-on:click="deleteFile(file)">delete</button>
+      <span>{{file.message}}</span>
+        </li>
+      <ul>
+      <form method="POST" :action="'http://'+bucket+'.'+host+'/'" enctype="multipart/form-data">
+        <input type="hidden" name="AWSAccessKeyId" :value="accessKey" />
+        <input type="hidden" name="key" value="${filename}" />
+        <input type="hidden" name="acl" value="private" />
+        <input type="hidden" name="success_action_redirect" value="http://g.testc.cn/file" />
+        <input type="hidden" name="Policy" :value="policyValue" />
+        <input type="hidden" name="Signature" :value="signatureValue" />
+        <input type="file" name="file" required/>
+        <input type="submit" value="上传" />
+      </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@3.1.9-1/crypto-js.js"></script>
+    <script type="text/javascript">
+      function encode(secret, key) {
+        return CryptoJS.AES.encrypt(secret, key).toString();
+      }
+      function decode(ciphertext, key) {
+        return CryptoJS.AES.decrypt(ciphertext, key).toString(CryptoJS.enc.Utf8);
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <script type="text/javascript">
+      var app = new Vue({
+        el: '#app',
+        data: {
+          secretKeyCypher: 'U2FsdGVkX19NFDF/Ww18rzxQQMcqVuf/wuOwTd7wWeZ49ceDsG1IqAx5UyD4mcnXZUa239KXHG86rZHz0hfHqg==',
+          accessKeyCypher: 'U2FsdGVkX1+aWA8POLpOtoHC08sHIW7ezOTZ16EfBQQUDtZxyZZR/Ceop4DbZ8oL',
+          bucketCypher: 'U2FsdGVkX186Gm6sP1/KD4ndDKarTB7UKzL8pu+njOY=',
+          hostCypher: 'U2FsdGVkX1+1nZ9Tt3XC/6dw9gGQ+HfuXRZINweKdEE=',
+          secretKey: '',
+          accessKey: '',
+          bucket: '',
+          host: '',
+          files: [],
+        },
+        created: function() {
+          let key = localStorage.getItem('key');
+          if (!key) {
+            key = prompt('input key');
+            localStorage.setItem('key', key);
+          }
+
+          this.secretKey = decode(this.secretKeyCypher, key);
+          this.accessKey = decode(this.accessKeyCypher, key);
+          this.bucket = decode(this.bucketCypher, key);
+          this.host = decode(this.hostCypher, key);
+
+          this.listFiles();
+        },
+        methods: {
+          ssig: function(resource, date, method) {
+            let secretKey = this.secretKey;
+                let strToSign = `${method}\n\n\n${+date/1000}\n${resource}`;
+                return CryptoJS.HmacSHA1(strToSign, secretKey).toString(CryptoJS.enc.Base64).substring(5, 15);
+          },
+          listFiles: function() {
+            let date = new Date();
+            let expire = new Date(parseInt(+date/1000 + 600)*1000);
+            let bucket = this.bucket;
+            let host = this.host;
+            let accessKey = this.accessKey;
+            let url = `http://${host}/${bucket}/?formatter=json`;
+            let ssig = this.ssig(`/${bucket}/`, expire, 'GET');
+        
+            url = `${url}&Expires=${+expire/1000}&KID=sina,${accessKey}&ssig=${encodeURI(ssig)}`;
+            let callback = data => {
+              let files = [];
+              for (file of data.Contents) {
+                let name = file.Name;
+                let resource = `/${bucket}/${encodeURI(name)}`;
+                let ssig = this.ssig(resource, expire, 'GET');
+                let url = `http://${host}${resource}?KID=sina,${accessKey}&ssig=${encodeURI(ssig)}&Expires=${+expire/1000}`;
+                let deleteSsig = this.ssig(resource, expire, 'DELETE');
+                let deleteUrl = `http://${bucket}.${host}/${name}?KID=sina,${accessKey}&ssig=${encodeURI(deleteSsig)}&Expires=${+expire/1000}`;
+                files.push({
+                  name,
+                  size: file.Size,
+                  url,
+                  deleteUrl,
+                  message: '',
+                });
+              }
+              this.files = files;
+              window.info.innerText = '';
+            }
+
+            fetch(url, { method: 'GET', mode: 'cors' })
+              .then(r => r.json())
+              .then(callback)
+              .catch(error => console.log(error));
+          },
+          deleteFile: function(file) {
+            file.message = 'deleting';
+            fetch(file.deleteUrl, { method: 'DELETE', mode: 'cors' })
+              .then(r => { 
+                if (r.status === 204) {
+                  file.message = 'deleted';
+                  this.files.splice(this.files.findIndex(item => item === file), 1);
+                } else {
+                  alert('delete fail');
+                }
+              })
+              .catch(error => {
+                console.log(error);
+                alert('delete fail');
+              });
+          },
+        },
+        computed: {
+          policyValue: function() {
+            let policy = {
+              expiration: new Date().toISOString(),
+              conditions: [
+                { bucket: this.bucket },
+                { acl: 'private' },
+                ['starts-with', '$key', ''],
+                ['content-length-range', 0, 52428800]
+              ]
+            };
+            let array = CryptoJS.enc.Utf8.parse(JSON.stringify(policy));
+            let base64 = CryptoJS.enc.Base64.stringify(array);
+            return base64;
+          },
+          signatureValue: function() {
+            return CryptoJS.HmacSHA1(this.policyValue, this.secretKey).toString(CryptoJS.enc.Base64);
+          }
+        }
+      });
+    </script>
 </body>
 </html>
