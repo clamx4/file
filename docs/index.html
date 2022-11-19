@@ -17,11 +17,11 @@
       <span>{{file.message}}</span>
         </li>
       <ul>
-      <form method="POST" :action="'http://'+bucket+'.'+host+'/'" enctype="multipart/form-data">
+      <form method="POST" :action="'https://'+bucket+'.'+host+'/'" enctype="multipart/form-data">
         <input type="hidden" name="AWSAccessKeyId" :value="accessKey" />
         <input type="hidden" name="key" value="${filename}" />
         <input type="hidden" name="acl" value="private" />
-        <input type="hidden" name="success_action_redirect" value="http://g.testc.cn/file" />
+        <input type="hidden" name="success_action_redirect" value="https://g.testc.cn/file" />
         <input type="hidden" name="Policy" :value="policyValue" />
         <input type="hidden" name="Signature" :value="signatureValue" />
         <input type="file" name="file" required/>
@@ -78,7 +78,7 @@
             let bucket = this.bucket;
             let host = this.host;
             let accessKey = this.accessKey;
-            let url = `http://${host}/${bucket}/?formatter=json`;
+            let url = `https://${host}/${bucket}/?formatter=json`;
             let ssig = this.ssig(`/${bucket}/`, expire, 'GET');
         
             url = `${url}&Expires=${+expire/1000}&KID=sina,${accessKey}&ssig=${encodeURI(ssig)}`;
@@ -88,9 +88,9 @@
                 let name = file.Name;
                 let resource = `/${bucket}/${encodeURI(name)}`;
                 let ssig = this.ssig(resource, expire, 'GET');
-                let url = `http://${host}${resource}?KID=sina,${accessKey}&ssig=${encodeURI(ssig)}&Expires=${+expire/1000}`;
+                let url = `https://${host}${resource}?KID=sina,${accessKey}&ssig=${encodeURI(ssig)}&Expires=${+expire/1000}`;
                 let deleteSsig = this.ssig(resource, expire, 'DELETE');
-                let deleteUrl = `http://${bucket}.${host}/${name}?KID=sina,${accessKey}&ssig=${encodeURI(deleteSsig)}&Expires=${+expire/1000}`;
+                let deleteUrl = `https://${bucket}.${host}/${name}?KID=sina,${accessKey}&ssig=${encodeURI(deleteSsig)}&Expires=${+expire/1000}`;
                 files.push({
                   name,
                   size: file.Size,
